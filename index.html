@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galpão 17 - Mapa 3D Interativo</title>
+<style>
+    body { margin: 0; overflow: hidden; background: #5a606a; font-family: sans-serif; }
+    #painel-topo { position: absolute; top: 15px; width: 100%; text-align: center; color: #fff; pointer-events: none; z-index: 10; text-shadow: 1px 1px 3px #000; }
+    #painel-topo h3 { margin: 0 0 4px 0; }
+    .etiqueta-texto { color: #FFF; background: rgba(0, 0, 0, 0.85); padding: 3px 5px; border-radius: 3px; font-size: 8.5px; box-shadow: 0 1px 3px rgba(0,0,0,0.5); text-align: center; }
+    .etiqueta-palco { color: #FFF; background: rgba(170, 0, 120, 0.9); padding: 3px 7px; border-radius: 3px; font-size: 9px; font-weight: bold; letter-spacing: 1px; box-shadow: 0 0 8px rgba(255,0,200,0.7); text-align: center; }
+    .etiqueta-lateral { color: #FFF; background: transparent; font-size: 10px; font-weight: bold; letter-spacing: 2px; writing-mode: vertical-rl; text-orientation: mixed; opacity: 0.85; text-shadow: 1px 1px 2px #000; }
+</style>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+</script>
+</head>
+<body>
+<div id="painel-topo"><h3>Mapa 3D - Galpão 17</h3>Arraste para girar • Role para zoom</div>
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+    // =========================================================
+    // CENA / CÂMERA / RENDER
+    // =========================================================
+    const COR_FUNDO = 0x5a606a;
+    const cena = new THREE.Scene();
+    cena.background = new THREE.Color(COR_FUNDO);
+    cena.fog = new THREE.Fog(COR_FUNDO, 45, 130);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 1000);
+    camera.position.set(0, 34, 36);
+
+    const renderizador = new THREE.WebGLRenderer({ antialias: true });
+    renderizador.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderizador.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderizador.domElement);
+
+    const renderizadorCSS = new CSS2DRenderer();
+    renderizadorCSS.setSize(window.innerWidth, window.innerHeight);
+    renderizadorCSS.domElement.style.position = 'absolute';
+    renderizadorCSS.domElement.style.top = '0px';
+    document.body.appendChild(renderizadorCSS.domElement);
+
+    const controles = new OrbitControls(camera, renderizadorCSS.domElement);
+    controles.enableDamping = true;
+    controles.maxPolarAngle = Math.PI / 2 - 0.1;
+    controles.autoRotate = true;
+    controles.autoRotateSpeed = -1.5;
+
+    // =========================================================
+    // ILUMINAÇÃO GERAL (mais clara)
+    // =========================================================
+    cena.add(new THREE.HemisphereLight(0xffffff, 0x9a9a9a, 2.2));
+    cena.add(new THREE.AmbientLight(0xffffff, 1.3));
+
+    const luzSol = new THREE.DirectionalLight(0xffffff, 3.0);
+    luzSol.position.set(15, 30, 15);
+    cena.add(luzSol);
+
+    const luzPreenchimento = new THREE.DirectionalLight(0xfff4e0, 1.6);
+    luzPreenchimento.position.set(-20, 25, -15);
+    cena.add(luzPreenchimento);
+
+    // =========================================================
+    // FUNÇÕES DE CONSTRUÇÃO
+    // =========================================================
+    function criarBloco(w, h, d, corHex, x, z, nomeLugar, rotY = 0) {
+        const geometria = new THREE.BoxGeometry(w, h, d);
+        const material = new THREE.MeshLambertMaterial({ color: corHex });
+        const malha = new THREE.Mesh(geometria, material);
+        malha.position.set(x, h / 2, z);
+        malha.rotation.y = rotY;
+        cena.add(malha);
+
+        if (nomeLugar) {
+            const elementoDiv = document.createElement('div');
+            elementoDiv.className = 'etiqueta-texto';
+            elementoDiv.innerHTML = nomeLugar;
+            const objCSS = new CSS2DObject(elementoDiv);
+            objCSS.position.set(0, h / 2 + 0.5, 0);
+            malha.add(objCSS);
+        }
+        return malha;
+    }
+
+    function criarTextoLateral(texto, x, z) {
+        const divTxt = document.createElement('div');
+        divTxt.className = 'etiqueta-lateral';
+        divTxt.textContent = texto;
+        const objTxt = new CSS2DObject(divTxt);
+        objTxt.position.set(x, 0.1, z);
+        cena.add(objTxt);
+    }
+
+    const matMadeira = new THREE.MeshLambertMaterial({ color: 0xc19a6b });
+    const matCadeira = new THREE.MeshLambertMaterial({ color: 0x553311 });
+
+    function addCadeira(grupo, cx, cz, rotY) {
+        const cadeira = new THREE.Group();
+        const assento = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.3), matCadeira);
+        assento.position.set(0, 0.25, 0);
+        const encosto = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.05), matCadeira);
+        encosto.position.set(0, 0.45, -0.125);
+        cadeira.add(assento);
+        cadeira.add(encosto);
+        cadeira.position.set(cx, 0, cz);
+        cadeira.rotation.y = rotY;
+        grupo.add(cadeira);
+    }
+
+    function criarMesaQuadrada(x, z, y = 0) {
+        const grupo = new THREE.Group();
+        const tampo = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.8), matMadeira);
+        tampo.position.set(0, 0.5, 0);
+        const pe = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.5, 4), matCadeira);
+        pe.position.set(0, 0.25, 0);
+        grupo.add(tampo);
+        grupo.add(pe);
+        addCadeira(grupo, 0, -0.6, 0);
+        addCadeira(grupo, 0, 0.6, Math.PI);
+        addCadeira(grupo, -0.6, 0, Math.PI / 2);
+        addCadeira(grupo, 0.6, 0, -Math.PI / 2);
+        grupo.position.set(x, y, z);
+        cena.add(grupo);
+    }
+
+    function criarMesaRedonda(x, z, y = 0) {
+        const grupo = new THREE.Group();
+        const tampo = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.05, 16), matMadeira);
+        tampo.position.set(0, 0.5, 0);
+        const pe = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 8), matCadeira);
+        pe.position.set(0, 0.25, 0);
+        grupo.add(tampo);
+        grupo.add(pe);
+        addCadeira(grupo, 0, -0.7, 0);
+        addCadeira(grupo, 0, 0.7, Math.PI);
+        addCadeira(grupo, -0.7, 0, Math.PI / 2);
+        addCadeira(grupo, 0.7, 0, -Math.PI / 2);
+        grupo.position.set(x, y, z);
+        cena.add(grupo);
+    }
+
+    function criarMesaRetangular(x, z, y = 0) {
+        const grupo = new THREE.Group();
+        const tampo = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 0.8), matMadeira);
+        tampo.position.set(0, 0.5, 0);
+        const pe1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 8), matCadeira);
+        pe1.position.set(-0.5, 0.25, 0);
+        const pe2 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 8), matCadeira);
+        pe2.position.set(0.5, 0.25, 0);
+        grupo.add(tampo);
+        grupo.add(pe1);
+        grupo.add(pe2);
+        addCadeira(grupo, -0.5, -0.6, 0);
+        addCadeira(grupo, 0, -0.6, 0);
+        addCadeira(grupo, 0.5, -0.6, 0);
+        addCadeira(grupo, -0.5, 0.6, Math.PI);
+        addCadeira(grupo, 0, 0.6, Math.PI);
+        addCadeira(grupo, 0.5, 0.6, Math.PI);
+        grupo.rotation.y = -Math.PI / 6;
+        grupo.position.set(x, y, z);
+        cena.add(grupo);
+    }
+
+    // =========================================================
+    // CHÃO
+    // =========================================================
+    const chao = new THREE.Mesh(
+        new THREE.PlaneGeometry(24, 16),
+        new THREE.MeshLambertMaterial({ color: 0x9c9c9c })
+    );
+    chao.rotation.x = -Math.PI / 2;
+    cena.add(chao);
+
+    const chaoExterno = new THREE.Mesh(
+        new THREE.PlaneGeometry(60, 50),
+        new THREE.MeshLambertMaterial({ color: 0x6f747c })
+    );
+    chaoExterno.rotation.x = -Math.PI / 2;
+    chaoExterno.position.y = -0.02;
+    cena.add(chaoExterno);
+
+    // =========================================================
+    // ESPAÇOS
+    // =========================================================
+    criarBloco(1.5, 1.5, 3, 0xc87a9f, -18, -5, 'KIDS');
+    criarBloco(1.5, 1.5, 3, 0x1144cc, -18, -1, 'CAIXAS');
+    criarBloco(1.5, 1.5, 3, 0xcc3322, -18, 2.5, 'PIZZAS');
+    criarBloco(4, 1.5, 2, 0x337733, -2.5, -13, 'FURYA GARAGE');
+    criarBloco(4, 1.5, 2, 0x8899aa, 2, -13, 'LAVA JATO');
+    criarBloco(2.5, 1.5, 1.5, 0xeeeeee, -1, -8.5, 'CREPE');
+    criarBloco(3, 1.5, 1.5, 0xffffff, -16, 9.5, 'Galpão Store');
+    criarBloco(3, 1.5, 1.5, 0x99ccff, -12.5, 9.5, 'YAKITON');
+    criarBloco(2.5, 1.5, 3, 0x77aa77, 9.5, -15, 'WC');
+
+    criarBloco(1, 0.5, 3, 0x111111, -12.5, -3, 'ENTRADA A');
+    criarBloco(1, 0.5, 3, 0x111111, -12.5, 4, 'ENTRADA B');
+    criarBloco(2, 1.2, 3, 0xffcc00, -10, 0, 'CHOPEIRA A');
+
+    criarBloco(3.5, 1.5, 1.5, 0xdd0000, -6, 7.5, 'BURGER');
+    criarBloco(3, 1.2, 1.5, 0x33cc33, 6, 7.5, 'DRINKS');
+
+    criarBloco(4, 0.5, 1, 0x111111, 4, -8.5, 'ENTRADA C');
+    criarBloco(2, 1.2, 4, 0xffcc00, 9, -11.5, 'CHOPEIRA B');
+
+    criarBloco(3, 1, 2, 0x00cc00, 13, -4, 'SINUCA<br>TÉRREO');
+    criarBloco(3, 1.5, 4, 0xff3333, 13, 6, 'PORCO<br>TÉRREO');
+
+    // MEZANINO
+    const mez = new THREE.Mesh(
+        new THREE.BoxGeometry(4, 4, 16),
+        new THREE.MeshLambertMaterial({ color: 0xffcc44, transparent: true, opacity: 0.6 })
+    );
+    mez.position.set(14, 2, 0);
+    cena.add(mez);
+
+    const divMez = document.createElement('div');
+    divMez.className = 'etiqueta-lateral';
+    divMez.innerHTML = 'MEZANINO<br>PISO SUPERIOR';
+    divMez.style.textAlign = 'center';
+    const labelMez = new CSS2DObject(divMez);
+    labelMez.position.set(14, 4.5, 0);
+    cena.add(labelMez);
+
+    criarTextoLateral('LATERAL ESQUERDA', 8, 0);
+    criarTextoLateral('LATERAL DIREITA', -4, 0);
+
+    const setinhaDiv = document.createElement('div');
+    setinhaDiv.style.color = '#fff';
+    setinhaDiv.style.fontSize = '12px';
+    setinhaDiv.style.fontWeight = 'bold';
+    setinhaDiv.style.textShadow = '1px 1px 2px #000';
+    setinhaDiv.style.transform = 'rotate(-30deg)';
+    setinhaDiv.innerHTML = '⬈ ENTRADA';
+    const setinha = new CSS2DObject(setinhaDiv);
+    setinha.position.set(-18, 0, 7.5);
+    cena.add(setinha);
+
+    // =========================================================
+    // MESAS
+    // =========================================================
+    criarMesaRedonda(-8, -10.5);
+    criarMesaRedonda(-5, -10.5);
+    criarMesaRedonda(-2, -10.5);
+    criarMesaRedonda(1, -10.5);
+    criarMesaRedonda(-14, -3);
+    criarMesaRedonda(-15, 2);
+    [-3.5, -1, 1.5, 4, 6.5].forEach(x => criarMesaQuadrada(x, -2.5));
+    criarMesaRedonda(-6, -1);
+    criarMesaRedonda(-6.5, 4);
+    criarMesaRedonda(-4.5, 6);
+    criarMesaRedonda(-7.5, 6.5);
+    criarMesaRedonda(8, 2.5);
+    criarMesaRedonda(6.5, 4.5);
+    criarMesaRedonda(8.5, 6);
+    criarMesaRetangular(11, 7.5);
+    criarMesaRedonda(13.5, 1, 4);
+    criarMesaQuadrada(14, 5, 4);
+
+    // SOFÁ EM L NO MEZANINO
+    const matSofa = new THREE.MeshLambertMaterial({ color: 0x181818 });
+    const sofaGroup = new THREE.Group();
+    const assentoMain = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.3, 0.8), matSofa);
+    assentoMain.position.set(0, 0.15, 0);
+    const encostoMain = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.4, 0.2), matSofa);
+    encostoMain.position.set(0, 0.5, -0.3);
+    const assentoL = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 1.2), matSofa);
+    assentoL.position.set(-0.7, 0.15, 1.0);
+    const encostoL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.4, 1.2), matSofa);
+    encostoL.position.set(-1.0, 0.5, 1.0);
+    sofaGroup.add(assentoMain, encostoMain, assentoL, encostoL);
+    sofaGroup.position.set(14.5, 4, -5.5);
+    sofaGroup.rotation.y = -Math.PI / 2;
+    cena.add(sofaGroup);
+
+    // =========================================================
+    // BONECOS (com articulações para animação)
+    // =========================================================
+    const coresRoupas = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff, 0xff9900];
+    const matPele = new THREE.MeshLambertMaterial({ color: 0xffddbb });
+    const matCalca = new THREE.MeshLambertMaterial({ color: 0x111111 });
+    const geoCabeca = new THREE.SphereGeometry(0.12, 16, 16);
+    const geoPescoco = new THREE.CylinderGeometry(0.04, 0.04, 0.1);
+    const geoTronco = new THREE.CylinderGeometry(0.2, 0.15, 0.55, 4);
+    const geoPerna = new THREE.CylinderGeometry(0.06, 0.05, 0.7, 8);
+    const geoSapato = new THREE.BoxGeometry(0.08, 0.08, 0.15);
+    const geoBraco = new THREE.CylinderGeometry(0.035, 0.03, 0.5, 8);
+    const geoManga = new THREE.CylinderGeometry(0.045, 0.04, 0.2, 8);
+
+    // Boneco olha para +Z no espaço local
+    function criarBoneco(corCamisa, matCalcaCustom) {
+        const matCamisa = new THREE.MeshLambertMaterial({ color: corCamisa });
+        const mCalca = matCalcaCustom || matCalca;
+        const grupo = new THREE.Group();
+        const corpo = new THREE.Group();
+        grupo.add(corpo);
+
+        const pernaEsq = new THREE.Mesh(geoPerna, mCalca);
+        pernaEsq.position.set(-0.1, 0.35, 0);
+        const pernaDir = new THREE.Mesh(geoPerna, mCalca);
+        pernaDir.position.set(0.1, 0.35, 0);
+        const sapatoEsq = new THREE.Mesh(geoSapato, matCalca);
+        sapatoEsq.position.set(-0.1, 0.04, 0.03);
+        const sapatoDir = new THREE.Mesh(geoSapato, matCalca);
+        sapatoDir.position.set(0.1, 0.04, 0.03);
+        grupo.add(pernaEsq, pernaDir, sapatoEsq, sapatoDir);
+
+        const tronco = new THREE.Mesh(geoTronco, matCamisa);
+        tronco.rotation.y = Math.PI / 4;
+        tronco.position.set(0, 1.1, 0);
+        const pescoco = new THREE.Mesh(geoPescoco, matPele);
+        pescoco.position.set(0, 1.4, 0);
+        corpo.add(tronco, pescoco);
+
+        const cabeca = new THREE.Group();
+        cabeca.position.set(0, 1.44, 0);
+        const esfera = new THREE.Mesh(geoCabeca, matPele);
+        esfera.position.set(0, 0.11, 0);
+        cabeca.add(esfera);
+        corpo.add(cabeca);
+
+        function criarOmbro(lado) {
+            const ombro = new THREE.Group();
+            ombro.position.set(0.23 * lado, 1.32, 0);
+            const manga = new THREE.Mesh(geoManga, matCamisa);
+            manga.position.set(0.01 * lado, -0.08, 0);
+            const braco = new THREE.Mesh(geoBraco, matPele);
+            braco.position.set(0.02 * lado, -0.27, 0);
+            ombro.add(manga, braco);
+            ombro.rotation.z = 0.12 * lado;
+            corpo.add(ombro);
+            return ombro;
+        }
+        const ombroEsq = criarOmbro(-1);
+        const ombroDir = criarOmbro(1);
+
+        return { grupo, corpo, cabeca, ombroEsq, ombroDir };
+    }
+
+    const dancarinos = [];
+
+    function gerarPessoa(posX, posZ, alturaY = 0, opcoes = {}) {
+        const cor = coresRoupas[Math.floor(Math.random() * coresRoupas.length)];
+        const b = criarBoneco(cor);
+        b.grupo.rotation.y = opcoes.olharPalco
+            ? (Math.random() - 0.5) * 0.5
+            : Math.random() * Math.PI * 2;
+        b.grupo.position.set(posX, alturaY, posZ);
+        cena.add(b.grupo);
+
+        if (opcoes.dancar) {
+            dancarinos.push({
+                ...b,
+                baseY: alturaY,
+                fase: Math.random() * Math.PI * 2,
+                pula: Math.random() < 0.6,
+                bracosAlto: Math.random() < 0.45
+            });
+        }
+        return b;
+    }
+
+    const posicoesPublico = [
+        [14, -5, 4.3], [14.5, -6, 4.3],
+        [13, 1, 4], [14.5, 1.5, 4],
+        [13.5, 5, 4], [14.5, 5.5, 4],
+        [12, -3.5, 0], [13, -5, 0], [14.5, -4, 0],
+        [-8.5, -0.5, 0], [-8.5, 0.5, 0],
+        [8.5, -11.5, 0], [9.5, -11.5, 0],
+        [8.5, -15.5, 0], [9.5, -15.5, 0],
+        [-13.5, -4, 0], [-14.5, 1.5, 0], [-13.0, -1, 0],
+        [-9, -8.5, 0], [-6, -10.5, 0], [-3, -8.5, 0], [0, -10.5, 0],
+        [-17, 8, 0], [-16, 7.5, 0], [-18, 8.2, 0], [-14, 7.8, 0],
+        [-16, -1, 0], [-16.5, 2.5, 0], [-15, 1, 0],
+        [-2, -11.5, 0], [1, -11.5, 0], [-1, -7, 0], [3, -11, 0]
+    ];
+    posicoesPublico.forEach(p => gerarPessoa(p[0], p[1], p[2]));
+
+    // Público em frente ao palco: olhando para a banda e dançando
+    for (let i = 0; i < 16; i++) {
+        const rx = (Math.random() * 6.4) - 3.2;
+        const rz = (Math.random() * 2.2) + 2.4;
+        gerarPessoa(rx, rz, 0, { olharPalco: true, dancar: true });
+    }
+
+    // =========================================================
+    // PALCO + ESTRUTURA DE SHOW
+    // =========================================================
+    const PALCO_X = 0, PALCO_Z = 7, PALCO_W = 8, PALCO_D = 4, PALCO_H = 0.6;
+    const TOPO_PALCO = PALCO_H;
+
+    criarBloco(PALCO_W, PALCO_H, PALCO_D, 0x008888, PALCO_X, PALCO_Z, null);
+
+    // Borda de LED na frente do palco
+    const matBordaLED = new THREE.MeshBasicMaterial({ color: 0xff00cc });
+    const bordaLED = new THREE.Mesh(new THREE.BoxGeometry(PALCO_W, 0.06, 0.04), matBordaLED);
+    bordaLED.position.set(PALCO_X, PALCO_H - 0.05, PALCO_Z - PALCO_D / 2 - 0.02);
+    cena.add(bordaLED);
+
+    const divPalco = document.createElement('div');
+    divPalco.className = 'etiqueta-palco';
+    divPalco.innerHTML = 'PALCO • AO VIVO';
+    const labelPalco = new CSS2DObject(divPalco);
+    labelPalco.position.set(PALCO_X, 5.0, PALCO_Z);
+    cena.add(labelPalco);
+
+    // Treliça (truss)
+    const matTruss = new THREE.MeshLambertMaterial({ color: 0x2b2b2b });
+    const TRUSS_Y = 4.2;
+    const TRUSS_Z_FRENTE = 5.3;
+    const TRUSS_Z_FUNDO = 8.7;
+    [[-4, TRUSS_Z_FRENTE], [4, TRUSS_Z_FRENTE], [-4, TRUSS_Z_FUNDO], [4, TRUSS_Z_FUNDO]].forEach(([x, z]) => {
+        const poste = new THREE.Mesh(new THREE.BoxGeometry(0.18, TRUSS_Y, 0.18), matTruss);
+        poste.position.set(x, TRUSS_Y / 2, z);
+        cena.add(poste);
+    });
+    [TRUSS_Z_FRENTE, TRUSS_Z_FUNDO].forEach(z => {
+        const barra = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.18, 0.18), matTruss);
+        barra.position.set(0, TRUSS_Y, z);
+        cena.add(barra);
+    });
+    [-4, 4].forEach(x => {
+        const barra = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, TRUSS_Z_FUNDO - TRUSS_Z_FRENTE), matTruss);
+        barra.position.set(x, TRUSS_Y, (TRUSS_Z_FRENTE + TRUSS_Z_FUNDO) / 2);
+        cena.add(barra);
+    });
+
+    // Telão de LED animado no fundo do palco
+    const canvasLED = document.createElement('canvas');
+    canvasLED.width = 512;
+    canvasLED.height = 160;
+    const ctxLED = canvasLED.getContext('2d');
+    const texLED = new THREE.CanvasTexture(canvasLED);
+    texLED.colorSpace = THREE.SRGBColorSpace;
+    const telao = new THREE.Mesh(
+        new THREE.PlaneGeometry(7.2, 2.25),
+        new THREE.MeshBasicMaterial({ map: texLED })
+    );
+    telao.position.set(PALCO_X, TOPO_PALCO + 1.55, PALCO_Z + PALCO_D / 2 - 0.08);
+    telao.rotation.y = Math.PI; // virado para o público
+    cena.add(telao);
+    const moldura = new THREE.Mesh(new THREE.BoxGeometry(7.5, 2.5, 0.1), matTruss);
+    moldura.position.set(PALCO_X, TOPO_PALCO + 1.55, PALCO_Z + PALCO_D / 2 - 0.02);
+    cena.add(moldura);
+
+    function desenharTelao(t, batida) {
+        const w = canvasLED.width, h = canvasLED.height;
+        const matiz = (t * 25) % 360;
+        const grad = ctxLED.createLinearGradient(0, 0, w, h);
+        grad.addColorStop(0, `hsl(${matiz}, 90%, 22%)`);
+        grad.addColorStop(1, `hsl(${(matiz + 120) % 360}, 90%, 18%)`);
+        ctxLED.fillStyle = grad;
+        ctxLED.fillRect(0, 0, w, h);
+
+        const barras = 32;
+        const larg = w / barras;
+        for (let i = 0; i < barras; i++) {
+            const nivel = 0.25 + 0.75 * Math.abs(Math.sin(t * 3 + i * 0.7) * Math.cos(t * 1.7 + i * 0.3)) * (0.6 + 0.4 * batida);
+            const alt = nivel * h * 0.9;
+            ctxLED.fillStyle = `hsl(${(matiz + i * 8) % 360}, 100%, 55%)`;
+            ctxLED.fillRect(i * larg + 2, h - alt, larg - 4, alt);
+        }
+
+        ctxLED.font = 'bold 54px sans-serif';
+        ctxLED.textAlign = 'center';
+        ctxLED.textBaseline = 'middle';
+        ctxLED.shadowColor = '#000';
+        ctxLED.shadowBlur = 12;
+        ctxLED.fillStyle = '#ffffff';
+        ctxLED.fillText('GALPÃO 17', w / 2, h / 2 - 10);
+        ctxLED.shadowBlur = 0;
+        texLED.needsUpdate = true;
+    }
+
+    // Caixas de som (PA) e retornos
+    const matCaixa = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+    const matTela = new THREE.MeshLambertMaterial({ color: 0x3a3a3a });
+    [-3.55, 3.55].forEach(x => {
+        const pa = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.8, 0.6), matCaixa);
+        pa.position.set(x, TOPO_PALCO + 0.9, 5.45);
+        cena.add(pa);
+        const tela = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.6, 0.02), matTela);
+        tela.position.set(x, TOPO_PALCO + 0.9, 5.14);
+        cena.add(tela);
+    });
+    [-1.4, 0, 1.4].forEach(x => {
+        const retorno = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.25, 0.35), matCaixa);
+        retorno.position.set(x, TOPO_PALCO + 0.12, 5.25);
+        retorno.rotation.x = 0.4;
+        cena.add(retorno);
+    });
+
+    // Amplificadores
+    const matAmp = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    const matAmpTela = new THREE.MeshLambertMaterial({ color: 0x8a6a3a });
+    function criarAmp(x, z) {
+        const amp = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.9, 0.45), matAmp);
+        amp.position.set(x, TOPO_PALCO + 0.45, z);
+        cena.add(amp);
+        const tela = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 0.02), matAmpTela);
+        tela.position.set(x, TOPO_PALCO + 0.4, z - 0.235);
+        cena.add(tela);
+    }
+    criarAmp(-2.7, 7.7);
+    criarAmp(2.7, 7.7);
+
+    // =========================================================
+    // BANDA
+    // =========================================================
+    const matPretoFosco = new THREE.MeshLambertMaterial({ color: 0x0d0d0d });
+    const matMetal = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+    const matDourado = new THREE.MeshLambertMaterial({ color: 0xd4a017 });
+
+    function criarInstrumentoCorda(corCorpo, comprimentoBraco) {
+        const inst = new THREE.Group();
+        const corpoInst = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.17, 0.2, 0.06, 12),
+            new THREE.MeshLambertMaterial({ color: corCorpo })
+        );
+        corpoInst.rotation.x = Math.PI / 2;
+        inst.add(corpoInst);
+        const braco = new THREE.Mesh(new THREE.BoxGeometry(0.05, comprimentoBraco, 0.03), matMadeira);
+        braco.position.set(0, comprimentoBraco / 2 + 0.12, 0);
+        inst.add(braco);
+        const mao = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.03), matPretoFosco);
+        mao.position.set(0, comprimentoBraco + 0.17, 0);
+        inst.add(mao);
+        return inst;
+    }
+
+    const matCalcaJeans = new THREE.MeshLambertMaterial({ color: 0x223355 });
+
+    // Vocalista
+    const vocal = criarBoneco(0x111111, matCalcaJeans);
+    vocal.grupo.position.set(0, TOPO_PALCO, 5.9);
+    vocal.grupo.rotation.y = Math.PI;
+    cena.add(vocal.grupo);
+    const microfone = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 10), matMetal);
+    microfone.position.set(0.02, -0.5, 0.06);
+    vocal.ombroDir.add(microfone);
+
+    const pedestal = new THREE.Group();
+    const hastePed = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.4, 6), matMetal);
+    hastePed.position.y = 0.7;
+    const basePed = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.02, 12), matPretoFosco);
+    pedestal.add(hastePed, basePed);
+    pedestal.position.set(-0.25, TOPO_PALCO, 5.55);
+    cena.add(pedestal);
+
+    // Guitarrista
+    const guitarrista = criarBoneco(0xcc0000, matCalcaJeans);
+    guitarrista.grupo.position.set(-2.3, TOPO_PALCO, 6.3);
+    guitarrista.grupo.rotation.y = Math.PI + 0.35;
+    cena.add(guitarrista.grupo);
+    const guitarra = criarInstrumentoCorda(0xb01818, 0.42);
+    guitarra.position.set(0.02, 0.95, 0.2);
+    guitarra.rotation.z = 1.05;
+    guitarrista.corpo.add(guitarra);
+
+    // Baixista
+    const baixista = criarBoneco(0x1d4ed8, matCalca);
+    baixista.grupo.position.set(2.3, TOPO_PALCO, 6.3);
+    baixista.grupo.rotation.y = Math.PI - 0.35;
+    cena.add(baixista.grupo);
+    const baixo = criarInstrumentoCorda(0x1a1a1a, 0.55);
+    baixo.position.set(0.02, 0.95, 0.2);
+    baixo.rotation.z = 1.1;
+    baixista.corpo.add(baixo);
+
+    // Bateria (praticável + kit)
+    const RISER_H = 0.3;
+    const riser = new THREE.Mesh(new THREE.BoxGeometry(2.4, RISER_H, 1.6), new THREE.MeshLambertMaterial({ color: 0x1f1f1f }));
+    riser.position.set(0, TOPO_PALCO + RISER_H / 2, 8.0);
+    cena.add(riser);
+    const TOPO_RISER = TOPO_PALCO + RISER_H;
+
+    const banco = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.45, 10), matPretoFosco);
+    banco.position.set(0, TOPO_RISER + 0.225, 8.35);
+    cena.add(banco);
+
+    const baterista = criarBoneco(0xffaa00, matCalca);
+    baterista.grupo.position.set(0, TOPO_RISER - 0.25, 8.35);
+    baterista.grupo.rotation.y = Math.PI;
+    cena.add(baterista.grupo);
+
+    const kit = new THREE.Group();
+    kit.position.set(0, TOPO_RISER, 7.7);
+    cena.add(kit);
+    const matCasco = new THREE.MeshLambertMaterial({ color: 0x8b0000 });
+    const matPele2 = new THREE.MeshLambertMaterial({ color: 0xf2f2f2 });
+
+    const bumbo = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.32, 18), [matCasco, matPele2, matPele2]);
+    bumbo.rotation.x = Math.PI / 2;
+    bumbo.position.set(0, 0.3, -0.1);
+    kit.add(bumbo);
+
+    function addTambor(r, alt, x, y, z) {
+        const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, alt, 16), [matCasco, matPele2, matCasco]);
+        t.position.set(x, y, z);
+        kit.add(t);
+        const perna = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, y, 6), matMetal);
+        perna.position.set(x, y / 2, z);
+        kit.add(perna);
+        return t;
+    }
+    addTambor(0.16, 0.12, 0.38, 0.55, 0.25);   // caixa
+    addTambor(0.13, 0.14, -0.15, 0.72, -0.05); // tom 1
+    addTambor(0.13, 0.14, 0.15, 0.72, -0.05);  // tom 2
+    addTambor(0.2, 0.3, -0.45, 0.35, 0.25);    // surdo
+
+    const pratos = [];
+    function addPrato(x, y, z) {
+        const haste = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, y, 6), matMetal);
+        haste.position.set(x, y / 2, z);
+        kit.add(haste);
+        const prato = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.012, 20), matDourado);
+        prato.position.set(x, y, z);
+        kit.add(prato);
+        pratos.push(prato);
+    }
+    addPrato(-0.55, 1.05, -0.15);
+    addPrato(0.6, 1.0, -0.1);
+    addPrato(0.5, 0.75, 0.35); // chimbal
+
+    // =========================================================
+    // LUZES DO SHOW
+    // =========================================================
+    // Wash (luz geral colorida no palco)
+    const lavagens = [
+        { cor: 0xff0033, pos: [-3, 2.8, 5] },
+        { cor: 0x00ffff, pos: [3, 2.8, 5] },
+        { cor: 0xff00ff, pos: [0, 3.2, 4.5] },
+        { cor: 0xffff00, pos: [0, 3.8, 8.5] }
+    ].map(l => {
+        const p = new THREE.PointLight(l.cor, 0, 7, 2);
+        p.position.set(...l.pos);
+        cena.add(p);
+        return p;
+    });
+
+    // Moving heads com feixe visível
+    const ALTURA_FEIXE = 8;
+    const geoFeixe = new THREE.ConeGeometry(0.55, ALTURA_FEIXE, 24, 1, true);
+    geoFeixe.translate(0, -ALTURA_FEIXE / 2, 0);
+    geoFeixe.rotateX(-Math.PI / 2); // ápice na origem, abre para +Z
+    const geoCabecaMovel = new THREE.BoxGeometry(0.28, 0.3, 0.28);
+    const geoLente = new THREE.SphereGeometry(0.09, 10, 10);
+
+    const movingHeads = [];
+    function criarMovingHead(x, y, z, indice, modo) {
+        const cor = new THREE.Color().setHSL((indice * 0.17) % 1, 1, 0.5);
+
+        const spot = new THREE.SpotLight(cor, 45, 18, Math.PI / 11, 0.45, 1.2);
+        spot.position.set(x, y, z);
+        cena.add(spot);
+        cena.add(spot.target);
+
+        const corpoFixture = new THREE.Mesh(geoCabecaMovel, matPretoFosco);
+        corpoFixture.position.set(x, y - 0.22, z);
+        cena.add(corpoFixture);
+
+        const matLente = new THREE.MeshBasicMaterial({ color: cor });
+        const lente = new THREE.Mesh(geoLente, matLente);
+        lente.position.set(x, y - 0.38, z);
+        cena.add(lente);
+
+        const matFeixe = new THREE.MeshBasicMaterial({
+            color: cor,
+            transparent: true,
+            opacity: 0.2,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+        const feixe = new THREE.Mesh(geoFeixe, matFeixe);
+        feixe.position.set(x, y - 0.38, z);
+        cena.add(feixe);
+
+        movingHeads.push({ spot, feixe, matFeixe, matLente, cor, base: new THREE.Vector3(x, y, z), indice, modo });
+    }
+    // Frente: varrem palco e público
+    [-3.3, -1.1, 1.1, 3.3].forEach((x, i) => criarMovingHead(x, TRUSS_Y, TRUSS_Z_FRENTE, i, 'frente'));
+    // Fundo: contraluz apontado para o público
+    [-2.5, 2.5].forEach((x, i) => criarMovingHead(x, TRUSS_Y, TRUSS_Z_FUNDO, i + 4, 'fundo'));
+
+    // Strobo
+    const strobo = new THREE.PointLight(0xffffff, 0, 9, 2);
+    strobo.position.set(0, 4.6, 6);
+    cena.add(strobo);
+
+    // =========================================================
+    // ANIMAÇÃO
+    // =========================================================
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderizador.setSize(window.innerWidth, window.innerHeight);
+        renderizadorCSS.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const relogio = new THREE.Clock();
+    const BPM = 124;
+    const alvoTmp = new THREE.Vector3();
+    let quadro = 0;
+
+    function animar() {
+        requestAnimationFrame(animar);
+        controles.update();
+
+        const t = relogio.getElapsedTime();
+        const posBatida = t * BPM / 60;              // batidas decorridas
+        const fase = posBatida * Math.PI * 2;        // 1 ciclo por batida
+        const numBatida = Math.floor(posBatida);
+        const fracBatida = posBatida - numBatida;
+        const pulso = Math.pow(1 - fracBatida, 3);   // pico no início da batida
+
+        // ---- Vocalista
+        vocal.corpo.rotation.y = Math.sin(fase * 0.5) * 0.25;
+        vocal.corpo.rotation.z = Math.sin(fase * 0.25) * 0.06;
+        vocal.ombroDir.rotation.x = -2.15 + Math.sin(fase * 0.5) * 0.08;
+        vocal.ombroDir.rotation.z = 0.35;
+        vocal.ombroEsq.rotation.z = -0.4 - Math.abs(Math.sin(fase * 0.25)) * 1.9;
+        vocal.ombroEsq.rotation.x = -0.3;
+        vocal.cabeca.rotation.x = Math.sin(fase) * 0.12;
+        vocal.grupo.position.y = TOPO_PALCO + Math.abs(Math.sin(fase * 0.5)) * 0.05;
+
+        // ---- Guitarrista
+        guitarrista.corpo.rotation.x = 0.08 + Math.abs(Math.sin(fase * 0.5)) * 0.12;
+        guitarrista.corpo.rotation.y = Math.sin(fase * 0.25) * 0.2;
+        guitarrista.cabeca.rotation.x = Math.abs(Math.sin(fase * 0.5)) * 0.55;
+        guitarrista.ombroDir.rotation.x = -0.75 + Math.sin(fase * 2) * 0.35;
+        guitarrista.ombroDir.rotation.z = 0.35;
+        guitarrista.ombroEsq.rotation.x = -1.0;
+        guitarrista.ombroEsq.rotation.z = -0.55 + Math.sin(fase * 0.5) * 0.08;
+        guitarrista.grupo.position.y = TOPO_PALCO + Math.max(0, Math.sin(fase * 0.5)) * 0.06;
+
+        // ---- Baixista
+        baixista.corpo.rotation.y = Math.sin(fase * 0.5 + 1) * 0.18;
+        baixista.cabeca.rotation.x = Math.abs(Math.sin(fase * 0.5 + 0.5)) * 0.35;
+        baixista.ombroDir.rotation.x = -0.75 + Math.sin(fase) * 0.25;
+        baixista.ombroDir.rotation.z = 0.35;
+        baixista.ombroEsq.rotation.x = -1.0;
+        baixista.ombroEsq.rotation.z = -0.6 + Math.sin(fase * 0.25) * 0.1;
+        baixista.grupo.position.y = TOPO_PALCO + Math.abs(Math.sin(fase * 0.5)) * 0.03;
+
+        // ---- Baterista
+        baterista.ombroEsq.rotation.x = -0.9 - Math.max(0, Math.sin(fase * 2)) * 0.7;
+        baterista.ombroDir.rotation.x = -0.9 - Math.max(0, Math.sin(fase * 2 + Math.PI)) * 0.7;
+        baterista.ombroEsq.rotation.z = -0.35;
+        baterista.ombroDir.rotation.z = 0.35;
+        baterista.cabeca.rotation.x = Math.abs(Math.sin(fase)) * 0.3;
+        baterista.corpo.rotation.x = 0.1 + pulso * 0.05;
+        pratos.forEach((p, i) => {
+            p.rotation.x = Math.sin(t * 18 + i) * 0.12 * (0.4 + pulso);
+            p.rotation.z = Math.cos(t * 15 + i) * 0.1 * (0.4 + pulso);
+        });
+        bumbo.scale.set(1 + pulso * 0.04, 1, 1 + pulso * 0.04);
+
+        // ---- Público dançando
+        dancarinos.forEach(d => {
+            const s = Math.sin(fase + d.fase);
+            if (d.pula) {
+                d.grupo.position.y = d.baseY + Math.max(0, s) * 0.2;
+            } else {
+                d.corpo.rotation.z = s * 0.08;
+            }
+            d.cabeca.rotation.x = Math.abs(Math.sin(fase + d.fase)) * 0.3;
+            if (d.bracosAlto) {
+                d.ombroEsq.rotation.z = -2.6 + s * 0.25;
+                d.ombroDir.rotation.z = 2.6 - s * 0.25;
+                d.ombroEsq.rotation.x = 0;
+                d.ombroDir.rotation.x = 0;
+            } else {
+                d.ombroEsq.rotation.x = -0.4 - Math.max(0, s) * 0.6;
+                d.ombroDir.rotation.x = -0.4 - Math.max(0, -s) * 0.6;
+            }
+        });
+
+        // ---- Wash colorido
+        lavagens[0].intensity = 4 + Math.abs(Math.sin(fase * 0.5)) * 10;
+        lavagens[1].intensity = 4 + Math.abs(Math.cos(fase * 0.5)) * 10;
+        lavagens[2].intensity = 3 + pulso * 12;
+        lavagens[3].intensity = 5 + Math.abs(Math.sin(fase * 0.25)) * 8;
+
+        // ---- Moving heads
+        const cicloCor = Math.floor(posBatida / 8); // troca de cor a cada 8 batidas
+        movingHeads.forEach(m => {
+            const i = m.indice;
+            if (m.modo === 'frente') {
+                alvoTmp.set(
+                    m.base.x * 0.7 + Math.sin(t * 0.9 + i * 1.3) * 2.4,
+                    0,
+                    4.6 + Math.sin(t * 0.7 + i * 0.9) * 2.4
+                );
+            } else {
+                alvoTmp.set(
+                    m.base.x * 1.4 + Math.sin(t * 0.6 + i) * 3.0,
+                    0,
+                    1.5 + Math.cos(t * 0.5 + i) * 1.8
+                );
+            }
+            m.spot.target.position.copy(alvoTmp);
+            m.feixe.lookAt(alvoTmp);
+
+            const matiz = ((cicloCor * 0.13) + i * 0.17) % 1;
+            m.cor.setHSL(matiz, 1, 0.5);
+            m.spot.color.copy(m.cor);
+            m.matFeixe.color.copy(m.cor);
+            m.matLente.color.copy(m.cor);
+
+            const pisca = 0.65 + 0.35 * pulso;
+            m.spot.intensity = 45 * pisca;
+            m.matFeixe.opacity = 0.12 + 0.12 * pisca;
+        });
+
+        // ---- Borda LED
+        matBordaLED.color.setHSL((t * 0.1) % 1, 1, 0.45 + pulso * 0.15);
+
+        // ---- Strobo a cada 16 batidas (4 flashes rápidos)
+        const noBloco = numBatida % 16 >= 14;
+        strobo.intensity = (noBloco && (Math.floor(t * 16) % 2 === 0)) ? 30 : 0;
+
+        // ---- Telão (a cada 2 quadros para poupar CPU)
+        if (quadro++ % 2 === 0) desenharTelao(t, pulso);
+
+        renderizador.render(cena, camera);
+        renderizadorCSS.render(cena, camera);
+    }
+    animar();
+</script>
+</body>
+</html>
